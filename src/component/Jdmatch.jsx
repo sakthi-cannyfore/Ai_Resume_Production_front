@@ -200,7 +200,7 @@ async function downloadPdf(jd, results) {
     });
   };
 
-  doc.setFillColor(79, 70, 229); 
+  doc.setFillColor(79, 70, 229);
   doc.rect(0, 0, pageW, 54, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
@@ -590,10 +590,8 @@ export default function JDMatch() {
         )}
       </div>
 
-      {/* Results */}
       {results && (
         <div>
-          {/* Results header with download */}
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               {results.total_matches} candidate
@@ -602,14 +600,12 @@ export default function JDMatch() {
             <DownloadBar jd={jd} results={results} />
           </div>
 
-          {/* Candidate cards */}
           <div className="space-y-4">
             {results.results.map((c, idx) => (
               <div
                 key={c.user_id}
                 className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow"
               >
-                {/* Top row */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3">
                     {c.image_url ? (
@@ -650,7 +646,6 @@ export default function JDMatch() {
                   </div>
                 </div>
 
-                {/* AI Analysis */}
                 {c.ai_analysis && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                     <AnalysisCard
@@ -689,7 +684,6 @@ export default function JDMatch() {
                   </div>
                 )}
 
-                {/* Resume link */}
                 {c.resume_file_url && (
                   <a
                     href={c.resume_file_url}
