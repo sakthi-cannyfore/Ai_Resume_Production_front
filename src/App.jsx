@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { FiUserPlus, FiZap, FiUsers, FiMenu, FiX, FiCpu } from "react-icons/fi";
+import { FiUserPlus, FiZap, FiUsers, FiMenu, FiX, FiCpu,FiCalendar  } from "react-icons/fi";
 import CreateUser from "./component/CreateUser";
 import JDMatch from "./component/Jdmatch";
 import AllUsers from "./component/Allusers";
 
 import cannyfore from "./assets/canny.png";
+// import InterviewScheduler from "./component/Interviewscheduler";
 
 const NAV = [
   {
@@ -28,6 +29,13 @@ const NAV = [
     icon: <FiUsers />,
     component: <AllUsers />,
   },
+//   {
+//   id: "interviews",
+//   label: "Interview Scheduler",
+//   desc: "Schedule and manage interviews",
+//   icon: <FiCalendar />,
+//   component: <InterviewScheduler />,
+// },
 ];
 
 export default function App() {

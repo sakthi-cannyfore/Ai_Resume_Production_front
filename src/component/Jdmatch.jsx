@@ -12,9 +12,8 @@ import {
   FiDownload,
 } from "react-icons/fi";
 
-// const API = "http://127.0.0.1:8000";
-const API = "https://endorsingly-subuncinal-toya.ngrok-free.dev";
-
+const API = "http://127.0.0.1:8000";
+// const API = "https://endorsingly-subuncinal-toya.ngrok-free.dev ";
 function ScoreBadge({ score }) {
   const n = parseFloat(score);
   const cls =
@@ -125,7 +124,7 @@ function downloadCsv(jd, results) {
     "Matched Skills",
     "Missing Skills",
     "Skills to Improve",
-    "Overall Summary",
+    // "Overall Summary",
     "Resume URL",
   ];
 
@@ -142,7 +141,7 @@ function downloadCsv(jd, results) {
       c.ai_analysis?.matched_skills ?? "",
       c.ai_analysis?.missing_skills ?? "",
       c.ai_analysis?.skills_to_improve ?? "",
-      c.ai_analysis?.overall_summary ?? "",
+      // c.ai_analysis?.overall_summary ?? "",
       c.resume_file_url ?? "",
     ]
       .map(escape)
@@ -161,6 +160,259 @@ function downloadCsv(jd, results) {
   URL.revokeObjectURL(url);
 }
 
+// ─── PDF Download ────────────────────────────────────────────────
+async function downloadPdf(jd, results) {
+  // Dynamically load jsPDF from CDN
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src =
+        "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  // ── helpers ──
+  const checkPage = (needed = 20) => {
+    if (y + needed > pageH - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  const wrapText = (text, x, startY, maxW, lineHeight = 14) => {
+    const lines = doc.splitTextToSize(String(text ?? ""), maxW);
+    lines.forEach((line) => {
+      checkPage(lineHeight);
+      doc.text(line, x, y);
+      y += lineHeight;
+    });
+  };
+
+  doc.setFillColor(79, 70, 229); 
+  doc.rect(0, 0, pageW, 54, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text("AI Resume Match Report", margin, 34);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(
+    `Generated: ${new Date().toLocaleString("en-IN")}`,
+    pageW - margin,
+    34,
+    { align: "right" },
+  );
+  y = 70;
+
+  doc.setFillColor(241, 245, 249); // slate-100
+  doc.roundedRect(margin, y, contentW, 18, 3, 3, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(51, 65, 85); // slate-700
+  doc.text("JOB DESCRIPTION", margin + 8, y + 12);
+  y += 24;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105); // slate-600
+  wrapText(jd, margin, y, contentW, 13);
+  y += 10;
+
+  // ── Candidates count ──
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(79, 70, 229);
+  checkPage(30);
+  doc.text(`MATCHED CANDIDATES  —  ${results.total_matches} found`, margin, y);
+  y += 18;
+
+  // ── Candidate cards ──
+  results.results.forEach((c, idx) => {
+    const ai = c.ai_analysis;
+    const cardPad = 10;
+
+    // Estimate card height roughly
+    checkPage(40);
+
+    // Card background
+    const cardStartY = y;
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(226, 232, 240); // slate-200
+
+    // ── Candidate header row ──
+    // Rank badge
+    doc.setFillColor(238, 242, 255); // indigo-100
+    doc.roundedRect(margin + cardPad, y, 22, 22, 4, 4, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(79, 70, 229);
+    doc.text(`#${idx + 1}`, margin + cardPad + 11, y + 14, { align: "center" });
+
+    // Name & meta
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59); // slate-800
+    doc.text(c.candidate_name || c.username, margin + cardPad + 28, y + 10);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`${c.email}  •  ${c.role}`, margin + cardPad + 28, y + 22);
+
+    // FAISS score (right side)
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`FAISS: ${c.similarity_score}`, pageW - margin - cardPad, y + 10, {
+      align: "right",
+    });
+
+    // AI matching score badge (right side)
+    if (ai?.matching_score) {
+      const score = parseFloat(ai.matching_score);
+      const [fr, fg, fb] =
+        score >= 75
+          ? [209, 250, 229]
+          : score >= 50
+            ? [254, 243, 199]
+            : [254, 226, 226];
+      const [tr, tg, tb] =
+        score >= 75 ? [6, 95, 70] : score >= 50 ? [120, 53, 15] : [153, 27, 27];
+
+      doc.setFillColor(fr, fg, fb);
+      doc.roundedRect(pageW - margin - cardPad - 52, y + 14, 52, 14, 4, 4, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(tr, tg, tb);
+      doc.text(ai.matching_score, pageW - margin - cardPad - 26, y + 23, {
+        align: "center",
+      });
+    }
+
+    y += 30;
+
+    // ── AI Analysis fields ──
+    if (ai) {
+      const fields = [
+        {
+          label: "Matched Skills",
+          value: ai.matched_skills,
+          color: [209, 250, 229],
+          tc: [6, 95, 70],
+        },
+        {
+          label: "Missing Skills",
+          value: ai.missing_skills,
+          color: [254, 226, 226],
+          tc: [153, 27, 27],
+        },
+        {
+          label: "Skills to Improve",
+          value: ai.skills_to_improve,
+          color: [254, 243, 199],
+          tc: [120, 53, 15],
+        },
+        // {
+        //   label: "Overall Summary",
+        //   value: ai.overall_summary,
+        //   color: [241, 245, 249],
+        //   tc: [51, 65, 85],
+        // },
+      ];
+
+      fields.forEach(({ label, value, color, tc }) => {
+        const lines = doc.splitTextToSize(
+          String(value ?? "—"),
+          contentW - cardPad * 2 - 70,
+        );
+        const blockH = lines.length * 12 + 20;
+        checkPage(blockH + 6);
+
+        doc.setFillColor(...color);
+        doc.roundedRect(
+          margin + cardPad,
+          y,
+          contentW - cardPad * 2,
+          blockH,
+          3,
+          3,
+          "F",
+        );
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(...tc);
+        doc.text(label, margin + cardPad + 6, y + 12);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        lines.forEach((line, li) => {
+          doc.text(line, margin + cardPad + 6, y + 22 + li * 12);
+        });
+
+        y += blockH + 6;
+      });
+    }
+
+    // Resume URL
+    if (c.resume_file_url) {
+      checkPage(16);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(79, 70, 229);
+      doc.textWithLink("View Resume →", margin + cardPad, y, {
+        url: c.resume_file_url,
+      });
+      y += 14;
+    }
+
+    // Card border (draw after content so we know height)
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(
+      margin,
+      cardStartY - 4,
+      contentW,
+      y - cardStartY + 10,
+      5,
+      5,
+    );
+
+    y += 16; // gap between cards
+  });
+
+  // ── Footer on every page ──
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(0, pageH - 28, pageW, 28, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text("AI Resume Analyser  •  Confidential", margin, pageH - 10);
+    doc.text(`Page ${p} of ${totalPages}`, pageW - margin, pageH - 10, {
+      align: "right",
+    });
+  }
+
+  doc.save(`jd_match_report_${Date.now()}.pdf`);
+}
+// ─────────────────────────────────────────────────────────────────
+
 function DownloadBar({ jd, results }) {
   const [open, setOpen] = useState(false);
 
@@ -171,6 +423,11 @@ function DownloadBar({ jd, results }) {
       label: "Download JSON",
       ext: "JSON",
       fn: () => downloadJson(jd, results),
+    },
+    {
+      label: "Download PDF",
+      ext: "PDF",
+      fn: () => downloadPdf(jd, results),
     },
   ];
 
@@ -237,11 +494,7 @@ export default function JDMatch() {
     fd.append("job_description", jd);
     fd.append("top_k", topK);
     try {
-      const res = await axios.post(`${API}/match-jd`, fd, {
-        headers: {
-          "ngrok-skip-browser-warning": "true",
-        },
-      });
+      const res = await axios.post(`${API}/match-jd`, fd);
       setResults(res.data);
     } catch (e) {
       setError(e.response?.data?.detail || e.message);
@@ -489,6 +742,14 @@ export default function JDMatch() {
                            text-slate-600 px-3 py-2 rounded-lg transition-colors bg-white"
               >
                 <FiDownload /> JSON
+              </button>
+              <button
+                onClick={() => downloadPdf(jd, results)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold
+                           border border-slate-300 hover:border-red-400 hover:text-red-600
+                           text-slate-600 px-3 py-2 rounded-lg transition-colors bg-white"
+              >
+                <FiDownload /> PDF
               </button>
             </div>
           </div>
