@@ -160,7 +160,6 @@ function downloadCsv(jd, results) {
   URL.revokeObjectURL(url);
 }
 
-// ─── PDF Download ────────────────────────────────────────────────
 async function downloadPdf(jd, results) {
   // Dynamically load jsPDF from CDN
   if (!window.jspdf) {
@@ -367,7 +366,6 @@ async function downloadPdf(jd, results) {
       });
     }
 
-    // Resume URL
     if (c.resume_file_url) {
       checkPage(16);
       doc.setFont("helvetica", "normal");
@@ -379,7 +377,6 @@ async function downloadPdf(jd, results) {
       y += 14;
     }
 
-    // Card border (draw after content so we know height)
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
     doc.roundedRect(

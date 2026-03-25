@@ -22,9 +22,25 @@ import {
   FiCheckCircle,
   FiXCircle,
   FiRefreshCw,
+  FiChevronDown,
+  FiCheck,
 } from "react-icons/fi";
 
 const API = "http://127.0.0.1:8000";
+
+const STATUSES = [
+  "Screening",
+  "L1 Interview",
+  "L2 Interview",
+  "HR Interview",
+  "Offer Released",
+  "Pre-Onboarding",
+  "Onboarded",
+  "Rejected",
+  "Awaiting Feedback",
+  "On Hold",
+  "Offer Rejected",
+];
 
 const STATUS_COLORS = {
   Screening: "bg-blue-50 text-blue-700 border-blue-200",
@@ -40,6 +56,20 @@ const STATUS_COLORS = {
   "Offer Rejected": "bg-rose-50 text-rose-700 border-rose-200",
 };
 
+const STATUS_DOT = {
+  Screening: "bg-blue-500",
+  "L1 Interview": "bg-indigo-500",
+  "L2 Interview": "bg-violet-500",
+  "HR Interview": "bg-purple-500",
+  "Offer Released": "bg-emerald-500",
+  "Pre-Onboarding": "bg-teal-500",
+  Onboarded: "bg-green-500",
+  Rejected: "bg-red-500",
+  "Awaiting Feedback": "bg-amber-500",
+  "On Hold": "bg-orange-500",
+  "Offer Rejected": "bg-rose-500",
+};
+
 const INTERVIEW_STATUS_COLORS = {
   Scheduled: "bg-blue-50 text-blue-700",
   Completed: "bg-green-50 text-green-700",
@@ -47,6 +77,108 @@ const INTERVIEW_STATUS_COLORS = {
   Rescheduled: "bg-orange-50 text-orange-700",
   "No Show": "bg-gray-100 text-gray-500",
 };
+
+function StatusUpdater({ userId, currentStatus, onUpdated }) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState(currentStatus);
+
+  const handleSelect = async (newStatus) => {
+    if (newStatus === status) {
+      setOpen(false);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setOpen(false);
+    try {
+      const fd = new FormData();
+      fd.append("status", newStatus);
+      await axios.patch(`${API}/users/${userId}/status`, fd);
+      setStatus(newStatus);
+      setSaved(true);
+      onUpdated?.(newStatus);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      setError(e.response?.data?.detail || "Update failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={saving}
+        className={`inline-flex items-center gap-2 text-xs font-semibold
+                    px-3 py-1.5 rounded-xl border transition select-none
+                    ${STATUS_COLORS[status] || "bg-gray-50 text-gray-600 border-gray-200"}
+                    ${saving ? "opacity-60 cursor-wait" : "cursor-pointer hover:opacity-80"}`}
+      >
+        {saving ? (
+          <FiRefreshCw className="animate-spin" style={{ fontSize: 11 }} />
+        ) : saved ? (
+          <FiCheck style={{ fontSize: 11 }} />
+        ) : null}
+        {status}
+        <FiChevronDown
+          style={{ fontSize: 11 }}
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {saved && (
+        <span className="absolute -top-6 left-0 text-xs text-emerald-600 font-medium whitespace-nowrap">
+          ✓ Status updated
+        </span>
+      )}
+      {error && (
+        <span className="absolute -top-6 left-0 text-xs text-red-500 font-medium whitespace-nowrap">
+          {error}
+        </span>
+      )}
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div
+            className="absolute left-0 top-full mt-1 z-20 w-52
+                        bg-white border border-slate-200 rounded-xl shadow-lg
+                        overflow-hidden py-1"
+          >
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                onClick={() => handleSelect(s)}
+                className={`w-full text-left flex items-center gap-2.5
+                            px-3 py-2 text-sm transition
+                            ${
+                              s === status
+                                ? "bg-slate-50 font-semibold text-slate-800"
+                                : "text-slate-600 hover:bg-slate-50"
+                            }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[s] || "bg-gray-400"}`}
+                />
+                {s}
+                {s === status && (
+                  <FiCheck
+                    className="ml-auto text-indigo-500"
+                    style={{ fontSize: 12 }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function InfoRow({ icon, label, value }) {
   return (
@@ -82,9 +214,14 @@ function Card({ children, className = "" }) {
   );
 }
 
-export default function UserDetail({ user, onBack }) {
+export default function UserDetail({ user, onBack, onStatusChange }) {
   const [interviews, setInterviews] = useState([]);
   const [iLoading, setILoading] = useState(true);
+  const [liveStatus, setLiveStatus] = useState(user?.status);
+
+  useEffect(() => {
+    setLiveStatus(user?.status);
+  }, [user?.status]);
 
   useEffect(() => {
     if (!user?.user_id) return;
@@ -104,13 +241,17 @@ export default function UserDetail({ user, onBack }) {
     month: "long",
     year: "numeric",
   });
-
   const skillList = user.skills
     ? user.skills
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
     : [];
+
+  const handleStatusUpdated = (newStatus) => {
+    setLiveStatus(newStatus);
+    onStatusChange?.(user.user_id, newStatus); // bubble up to parent list if needed
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-2 sm:px-0">
@@ -123,8 +264,9 @@ export default function UserDetail({ user, onBack }) {
         Back to Candidates
       </button>
 
+      {/* ── Profile header ── */}
       <div className="rounded-2xl border bg-white border-slate-200 shadow-sm overflow-hidden mb-5">
-        <div className="h-20  relative">
+        <div className="h-20 relative">
           <div
             className="absolute inset-0 opacity-10"
             style={{
@@ -141,8 +283,7 @@ export default function UserDetail({ user, onBack }) {
               <img
                 src={user.image_url}
                 alt={user.username}
-                // className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-4 border-white shadow-xl shrink-0"
-                className="w-55 h-70 rounded-2xl object-cover  shadow-md shrink-0"
+                className="w-55 h-70 rounded-2xl object-cover shadow-md shrink-0"
               />
             ) : (
               <div
@@ -163,21 +304,23 @@ export default function UserDetail({ user, onBack }) {
                   {user.email}
                 </p>
               </div>
+
               <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-end">
+                {/* role badge */}
                 <span
                   className="inline-flex items-center bg-indigo-50 text-indigo-700
                                  text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-100"
                 >
                   {user.role}
                 </span>
-                {user.status && (
-                  <span
-                    className={`inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-xl border
-                    ${STATUS_COLORS[user.status] || "bg-gray-50 text-gray-600 border-gray-200"}`}
-                  >
-                    {user.status}
-                  </span>
-                )}
+
+                <div className="relative">
+                  <StatusUpdater
+                    userId={user.user_id}
+                    currentStatus={liveStatus}
+                    onUpdated={handleStatusUpdated}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -294,7 +437,22 @@ export default function UserDetail({ user, onBack }) {
             label="Notice Period"
             value={user.notice_period}
           />
-          <InfoRow icon={<FiAward />} label="Status" value={user.status} />
+
+          <div className="flex items-start gap-3 py-2.5">
+            <span className="text-indigo-400 text-base mt-0.5 shrink-0">
+              <FiAward />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+                Hiring Status
+              </p>
+              <StatusUpdater
+                userId={user.user_id}
+                currentStatus={liveStatus}
+                onUpdated={handleStatusUpdated}
+              />
+            </div>
+          </div>
         </Card>
 
         <Card>
@@ -396,7 +554,7 @@ export default function UserDetail({ user, onBack }) {
                       target="_blank"
                       rel="noreferrer"
                       className="shrink-0 inline-flex items-center gap-1 text-xs bg-indigo-600
-                                 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg font-medium transition"
+                                  hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg font-medium transition"
                     >
                       <FiExternalLink style={{ fontSize: 11 }} /> Join
                     </a>
@@ -480,8 +638,8 @@ export default function UserDetail({ user, onBack }) {
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs bg-indigo-600
-                                   hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg
-                                   font-medium transition whitespace-nowrap"
+                                    hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg
+                                    font-medium transition whitespace-nowrap"
                       >
                         <FiExternalLink style={{ fontSize: 11 }} /> Open
                       </a>
@@ -563,7 +721,7 @@ export default function UserDetail({ user, onBack }) {
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-xs text-indigo-600
-                                     hover:text-indigo-800 font-medium transition"
+                                      hover:text-indigo-800 font-medium transition"
                         >
                           <FiExternalLink style={{ fontSize: 11 }} /> Open
                         </a>

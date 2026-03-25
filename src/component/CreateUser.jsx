@@ -99,7 +99,7 @@ function SkillsTextarea({ value, onChange }) {
         onChange={onChange}
         rows={2}
         placeholder="React, Node.js, Python, SQL..."
-        className="w-full px-3 py-7  h-30 border border-slate-200 rounded-xl text-sm
+        className="w-full px-3 py-7 h-30 border border-slate-200 rounded-xl text-sm
                    focus:outline-none focus:ring-2 focus:ring-indigo-400
                    bg-slate-50 text-slate-800 placeholder-slate-300 transition resize-none"
       />
@@ -132,11 +132,17 @@ export default function CreateUser() {
     try {
       const fd = new FormData();
       fd.append("resume", file);
-      const res = await axios.post(`${API}/parse-resume`, fd);
+      fd.append("username", "_extract_");
+      fd.append("email", "_extract_@extract.com");
+      fd.append("role", "_extract_");
+      fd.append("extract_only", "1"); // ← tells the route: parse only, don't save
+
+      const res = await axios.post(`${API}/users`, fd);
       const d = res.data;
+
       setForm((prev) => ({
         ...prev,
-        username: d.candidate_name || prev.username,
+        username: d.username || prev.username,
         email: d.email || prev.email,
         role: d.role || prev.role,
         phone: d.phone || prev.phone,
@@ -223,8 +229,8 @@ export default function CreateUser() {
 
       {mode === "ai" && (
         <div className="mb-5 p-4 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-700">
-          Upload a resume — AI will auto-fill all fields. You can edit any field
-          before submitting.
+          Upload a resume — fields will be extracted automatically. Review and
+          submit to register.
         </div>
       )}
 
@@ -274,7 +280,7 @@ export default function CreateUser() {
               <div className="min-w-0">
                 <p className="text-sm text-slate-500 truncate">
                   {aiLoading
-                    ? "Extracting with AI..."
+                    ? "Extracting fields..."
                     : resume
                       ? resume.name
                       : "Upload resume"}
